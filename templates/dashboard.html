@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Frankfurter · API Test Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:       #f4f1eb;
+  --surface:  #fffdf8;
+  --ink:      #1a1a18;
+  --muted:    #7a7a72;
+  --border:   #dedad2;
+  --pass:     #1e7a3e;
+  --pass-bg:  #e6f4ec;
+  --fail:     #b8291c;
+  --fail-bg:  #fbeae8;
+  --error:    #9a6200;
+  --error-bg: #fdf3e0;
+  --accent:   #1a4fd6;
+  --accent-bg:#e8eefb;
+  --radius:   2px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+header {
+  background: var(--ink);
+  color: #f4f1eb;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+.logo-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.logo-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: #aaa89e;
+  letter-spacing: 0.04em;
+}
+.header-actions { display: flex; gap: 0.6rem; align-items: center; }
+
+.btn {
+  padding: 0.45rem 1.1rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn-primary { background: #d4f0e0; color: #0f4423; }
+.btn-ghost   { background: rgba(255,255,255,0.1); color: #f4f1eb; }
+.btn-export  { background: #2b2b28; color: #aaa89e; font-size: 0.7rem; padding: 0.4rem 0.9rem; }
+
+/* ── Layout ── */
+main { max-width: 1140px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+/* ── Status bar ── */
+#status-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+#status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+#status-dot.ok   { background: var(--pass); box-shadow: 0 0 0 3px var(--pass-bg); }
+#status-dot.fail { background: var(--fail); box-shadow: 0 0 0 3px var(--fail-bg); }
+#status-dot.running { animation: pulse 0.8s ease-in-out infinite alternate; }
+@keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
+
+/* ── KPI Grid ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.3rem;
+  position: relative;
+  overflow: hidden;
+}
+.kpi::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 100%; height: 3px;
+  background: var(--border);
+}
+.kpi.green::after { background: var(--pass); }
+.kpi.red::after   { background: var(--fail); }
+.kpi.blue::after  { background: var(--accent); }
+.kpi.amber::after { background: #c87c00; }
+.kpi-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.3rem;
+}
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.kpi-value.pass-color  { color: var(--pass); }
+.kpi-value.fail-color  { color: var(--fail); }
+.kpi-value.blue-color  { color: var(--accent); }
+.kpi-value.amber-color { color: #c87c00; }
+.kpi-sub {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── Charts ── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+}
+.chart-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+/* ── Section ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 1.8rem 0 0.8rem;
+}
+.section-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+/* ── Table ── */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+table { width: 100%; border-collapse: collapse; }
+thead { background: #f0ece4; }
+th {
+  text-align: left;
+  padding: 0.55rem 0.9rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #faf8f3; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+}
+.badge.PASS  { background: var(--pass-bg);  color: var(--pass); }
+.badge.FAIL  { background: var(--fail-bg);  color: var(--fail); }
+.badge.ERROR { background: var(--error-bg); color: var(--error); }
+
+/* ── Latency bar ── */
+.lat-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lat-fill {
+  height: 4px;
+  background: var(--accent);
+  border-radius: 2px;
+  opacity: 0.5;
+}
+
+/* ── Run accordion ── */
+.run-row { cursor: pointer; }
+.run-row:hover td { background: #faf8f3; }
+.run-detail { display: none; }
+.run-detail.open { display: table-row-group; }
+.run-detail td {
+  background: #f7f4ee;
+  padding: 0.4rem 0.9rem 0.4rem 2.4rem;
+  font-size: 0.76rem;
+  border-bottom: 1px solid #ece9e1;
+}
+
+/* ── Health card ── */
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.health-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.78rem;
+}
+.health-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+
+/* ── Empty state ── */
+.empty {
+  text-align: center;
+  padding: 2.5rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── Spinner ── */
+.spin {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border: 2px solid #ccc;
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 768px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .charts-row { grid-template-columns: 1fr; }
+  .health-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div>
+      <div class="logo-title">Frankfurter · API Test Monitor</div>
+      <div class="logo-sub">Testing as Code · SQLite · PythonAnywhere</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-export" onclick="exportJSON()">⬇ Export JSON</button>
+    <a href="/health" class="btn btn-ghost" style="text-decoration:none">/ health</a>
+    <button class="btn btn-primary" id="runBtn" onclick="runTests()">▶ Lancer les tests</button>
+  </div>
+</header>
+
+<main>
+  <div id="status-bar">
+    <div id="status-dot"></div>
+    <span id="status-msg">Prêt — cliquez sur "Lancer les tests" pour démarrer un run.</span>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi green">
+      <div class="kpi-label">Tests passés</div>
+      <div class="kpi-value pass-color" id="k-pass">—</div>
+      <div class="kpi-sub" id="k-pass-sub">dernier run</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-label">Échecs + erreurs</div>
+      <div class="kpi-value fail-color" id="k-fail">—</div>
+      <div class="kpi-sub" id="k-fail-sub">dernier run</div>
+    </div>
+    <div class="kpi blue">
+      <div class="kpi-label">Latence moyenne</div>
+      <div class="kpi-value blue-color" id="k-avg">—</div>
+      <div class="kpi-sub" id="k-avg-sub">ms · p95 : — ms</div>
+    </div>
+    <div class="kpi amber">
+      <div class="kpi-label">Disponibilité</div>
+      <div class="kpi-value amber-color" id="k-avail">—</div>
+      <div class="kpi-sub">taux de succès</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Latence avg & p95 par run (ms)</div>
+      <canvas id="latencyChart" height="140"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Statuts — dernier run</div>
+      <canvas id="statusChart" height="140"></canvas>
+    </div>
+  </div>
+
+  <!-- Last run tests detail -->
+  <div class="section-header">
+    <div class="section-title">Détail du dernier run</div>
+    <span id="last-run-ts" style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:var(--muted)"></span>
+  </div>
+  <div class="table-wrap" id="last-run-table">
+    <div class="empty">Aucun run exécuté.</div>
+  </div>
+
+  <!-- History -->
+  <div class="section-header" style="margin-top:2rem">
+    <div class="section-title">Historique des runs</div>
+  </div>
+  <div class="table-wrap" id="history-table">
+    <div class="empty">Aucun historique disponible.</div>
+  </div>
+</main>
+
+<script>
+let latChart, stChart;
+
+function setStatus(msg, state) {
+  const dot = document.getElementById('status-dot');
+  document.getElementById('status-msg').innerHTML = msg;
+  dot.className = state || '';
+}
+
+async function runTests() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>En cours…';
+  setStatus('<span class="spin"></span>Exécution des tests en cours…', 'running');
+
+  try {
+    const resp = await fetch('/run');
+    const data = await resp.json();
+
+    if (data.error) {
+      setStatus('⚠ ' + data.error, 'fail');
+      btn.disabled = false;
+      btn.innerHTML = '▶ Lancer les tests';
+      return;
+    }
+
+    const s = data.summary;
+    document.getElementById('k-pass').textContent = s.passed;
+    document.getElementById('k-pass-sub').textContent = `sur ${s.total} tests`;
+    document.getElementById('k-fail').textContent = s.failed + s.errors;
+    document.getElementById('k-fail-sub').textContent = `${s.failed} FAIL · ${s.errors} ERROR`;
+    document.getElementById('k-avg').textContent = s.latency_ms_avg + ' ms';
+    document.getElementById('k-avg-sub').textContent = `p95 : ${s.latency_ms_p95} ms`;
+    document.getElementById('k-avail').textContent = s.availability + '%';
+
+    renderLastRunTable(data.tests, data.timestamp);
+    renderStatusChart(s.passed, s.failed, s.errors);
+
+    const state = (s.failed + s.errors) === 0 ? 'ok' : 'fail';
+    setStatus(
+      `✓ Run terminé · ${s.passed}/${s.total} tests passés · avg ${s.latency_ms_avg} ms · ${data.timestamp}`,
+      state
+    );
+
+    await loadHistory();
+  } catch(e) {
+    setStatus('✗ Erreur réseau : ' + e.message, 'fail');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '▶ Relancer les tests';
+}
+
+function renderLastRunTable(tests, ts) {
+  document.getElementById('last-run-ts').textContent = ts || '';
+  if (!tests || !tests.length) return;
+  const rows = tests.map(t => {
+    const bar = `<span class="lat-fill" style="width:${Math.min((t.latency_ms||0)/8,90)}px"></span>`;
+    return `<tr>
+      <td>${t.name}</td>
+      <td><span class="badge ${t.status}">${t.status}</span></td>
+      <td class="mono"><span class="lat-bar">${t.latency_ms ?? '—'} ms ${bar}</span></td>
+      <td style="color:var(--muted);font-size:0.73rem">${t.message ?? ''}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('last-run-table').innerHTML = `
+    <table>
+      <thead><tr><th>Test</th><th>Statut</th><th>Latence</th><th>Message</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderStatusChart(passed, failed, errors) {
+  if (stChart) stChart.destroy();
+  stChart = new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['PASS', 'FAIL', 'ERROR'],
+      datasets: [{ data: [passed, failed, errors],
+        backgroundColor: ['#1e7a3e','#b8291c','#9a6200'],
+        borderWidth: 0, hoverOffset: 4 }]
+    },
+    options: {
+      cutout: '72%',
+      plugins: {
+        legend: { labels: { color: '#1a1a18', font: { family: 'IBM Plex Mono', size: 11 } } }
+      }
+    }
+  });
+}
+
+async function loadHistory() {
+  const resp = await fetch('/runs');
+  const runs = await resp.json();
+  if (!runs.length) return;
+
+  // Update latency chart
+  const labels = runs.slice().reverse().map((_, i) => `#${i + 1}`);
+  const avgs   = runs.slice().reverse().map(r => r.latency_avg);
+  const p95s   = runs.slice().reverse().map(r => r.latency_p95);
+
+  if (latChart) latChart.destroy();
+  latChart = new Chart(document.getElementById('latencyChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'avg ms', data: avgs, borderColor: '#1a4fd6',
+          backgroundColor: 'rgba(26,79,214,0.08)', tension: 0.3, pointRadius: 3, fill: true },
+        { label: 'p95 ms', data: p95s, borderColor: '#c87c00',
+          backgroundColor: 'rgba(200,124,0,0.06)', tension: 0.3, pointRadius: 3,
+          borderDash: [4,3], fill: false }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color:'#7a7a72', font: { family:'IBM Plex Mono', size:10 } } } },
+      scales: {
+        x: { ticks: { color:'#7a7a72', font:{size:9} }, grid: { color:'#dedad2' } },
+        y: { ticks: { color:'#7a7a72', font:{size:9} }, grid: { color:'#dedad2' }, beginAtZero: true }
+      }
+    }
+  });
+
+  // History table
+  const rows = runs.map((r, i) => {
+    const rate = r.availability;
+    const col  = rate === 100 ? 'var(--pass)' : rate >= 80 ? '#c87c00' : 'var(--fail)';
+    const passed = r.passed, fail = r.failed + r.errors;
+    const detailId = `detail-${i}`;
+    const testRows = (r.tests || []).map(t =>
+      `<tr class="run-detail" id="${detailId}">
+        <td colspan="2" class="mono">${t.name}</td>
+        <td><span class="badge ${t.status}">${t.status}</span></td>
+        <td>${t.latency_ms} ms</td>
+        <td style="color:var(--muted)">${t.message||''}</td>
+      </tr>`
+    ).join('');
+    return `
+      <tr class="run-row" onclick="toggleDetail('${detailId}', this)">
+        <td class="mono">#${runs.length - i}</td>
+        <td class="mono" style="color:var(--muted);font-size:0.72rem">${r.timestamp}</td>
+        <td style="color:${col};font-weight:600">${rate}%</td>
+        <td style="color:var(--pass)">${passed}</td>
+        <td style="color:${fail>0?'var(--fail)':'var(--muted)'}">${fail}</td>
+        <td class="mono">${r.latency_avg} ms</td>
+        <td class="mono" style="color:var(--muted)">${r.latency_p95} ms</td>
+        <td style="color:var(--muted);font-size:0.7rem">▶ détails</td>
+      </tr>
+      ${testRows}`;
+  }).join('');
+
+  document.getElementById('history-table').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>#</th><th>Timestamp (UTC)</th><th>Dispo.</th>
+        <th>PASS</th><th>FAIL+ERR</th><th>Avg ms</th><th>P95 ms</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function toggleDetail(id, row) {
+  const cells = document.querySelectorAll(`#${id}`);
+  cells.forEach(c => c.classList.toggle('open'));
+  const arrow = row.querySelector('td:last-child');
+  if(arrow) arrow.textContent = cells[0].classList.contains('open') ? '▼ masquer' : '▶ détails';
+}
+
+async function exportJSON() {
+  const resp = await fetch('/export');
+  const data = await resp.json();
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'api_test_results.json';
+  a.click();
+}
+
+// Charger l'historique au démarrage
+loadHistory();
+</script>
+</body>
+</html>
