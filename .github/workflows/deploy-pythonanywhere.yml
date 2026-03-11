@@ -1,9 +1,8 @@
-name: Deploy to PythonAnywhere (recursive upload)
+name: Deploy to PythonAnywhere
 
 on:
   push:
-    branches: ["main"]
-  workflow_dispatch:
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -13,63 +12,85 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate required secrets
-        shell: bash
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Syntax check
         run: |
-          set -euo pipefail
-          : "${{ secrets.PA_USERNAME }}"
-          : "${{ secrets.PA_TOKEN }}"
-          : "${{ secrets.PA_TARGET_DIR }}"
-          : "${{ secrets.PA_WEBAPP_DOMAIN }}"
+          python -c "import ast; ast.parse(open('flask_app.py').read()); print('flask_app.py OK')"
+          python -c "import ast; ast.parse(open('storage.py').read()); print('storage.py OK')"
+          python -c "import ast; ast.parse(open('tester/client.py').read()); print('client.py OK')"
+          python -c "import ast; ast.parse(open('tester/tests.py').read()); print('tests.py OK')"
+          python -c "import ast; ast.parse(open('tester/runner.py').read()); print('runner.py OK')"
 
-      - name: Upload all files recursively (dirs auto-created by Files API)
-        shell: bash
+      - name: Upload flask_app.py
         run: |
-          set -euo pipefail
-          USER="${{ secrets.PA_USERNAME }}"
-          TOKEN="${{ secrets.PA_TOKEN }}"
-          TARGET_DIR="${{ secrets.PA_TARGET_DIR }}"
-          DOMAIN="${{ secrets.PA_WEBAPP_DOMAIN }}"
+          curl -sf -X POST \
+            "https://www.pythonanywhere.com/api/v0/user/${{ secrets.PA_USERNAME }}/files/path${{ secrets.PA_TARGET_DIR }}/flask_app.py" \
+            -H "Authorization: Token ${{ secrets.PA_TOKEN }}" \
+            -F "content=@flask_app.py"
 
-          # Optional: set PA_HOST secret to "eu.pythonanywhere.com" if your account is on EU.
-          HOST="${{ secrets.PA_HOST }}"
-          if [[ -z "${HOST}" ]]; then HOST="www.pythonanywhere.com"; fi
+      - name: Upload storage.py
+        run: |
+          curl -sf -X POST \
+            "https://www.pythonanywhere.com/api/v0/user/${{ secrets.PA_USERNAME }}/files/path${{ secrets.PA_TARGET_DIR }}/storage.py" \
+            -H "Authorization: Token ${{ secrets.PA_TOKEN }}" \
+            -F "content=@storage.py"
 
-          echo "Using PythonAnywhere host: ${HOST}"
-          echo "Target directory: ${TARGET_DIR}"
+      - name: Upload requirements.txt
+        run: |
+          curl -sf -X POST \
+            "https://www.pythonanywhere.com/api/v0/user/${{ secrets.PA_USERNAME }}/files/path${{ secrets.PA_TARGET_DIR }}/requirements.txt" \
+            -H "Authorization: Token ${{ secrets.PA_TOKEN }}" \
+            -F "content=@requirements.txt"
 
-          # Upload every file; remote directories are created automatically by the Files API.
-          while IFS= read -r -d '' file; do
-            rel="${file#./}"
+      - name: Upload tester/client.py
+        run: |
+          curl -sf -X POST \
+            "https://www.pythonanywhere.com/api/v0/user/${{ secrets.PA_USERNAME }}/files/path${{ secrets.PA_TARGET_DIR }}/tester/client.py" \
+            -H "Authorization: Token ${{ secrets.PA_TOKEN }}" \
+            -F "content=@tester/client.py"
 
-            # Exclusions (adjust to taste)
-            case "$rel" in
-              .git/*|.github/*|.venv/*|__pycache__/*|node_modules/*) continue ;;
-              *.pyc|.DS_Store) continue ;;
-            esac
+      - name: Upload tester/tests.py
+        run: |
+          curl -sf -X POST \
+            "https://www.pythonanywhere.com/api/v0/user/${{ secrets.PA_USERNAME }}/files/path${{ secrets.PA_TARGET_DIR }}/tester/tests.py" \
+            -H "Authorization: Token ${{ secrets.PA_TOKEN }}" \
+            -F "content=@tester/tests.py"
 
-            remote_path="${TARGET_DIR}/${rel}"
-            echo " - ${rel} -> ${remote_path}"
+      - name: Upload tester/runner.py
+        run: |
+          curl -sf -X POST \
+            "https://www.pythonanywhere.com/api/v0/user/${{ secrets.PA_USERNAME }}/files/path${{ secrets.PA_TARGET_DIR }}/tester/runner.py" \
+            -H "Authorization: Token ${{ secrets.PA_TOKEN }}" \
+            -F "content=@tester/runner.py"
 
-            curl -sS --fail -X POST \
-              -H "Authorization: Token ${TOKEN}" \
-              -F "content=@${file}" \
-              "https://${HOST}/api/v0/user/${USER}/files/path${remote_path}" \
-              >/dev/null
+      - name: Upload tester/__init__.py
+        run: |
+          echo "" > /tmp/__init__.py
+          curl -sf -X POST \
+            "https://www.pythonanywhere.com/api/v0/user/${{ secrets.PA_USERNAME }}/files/path${{ secrets.PA_TARGET_DIR }}/tester/__init__.py" \
+            -H "Authorization: Token ${{ secrets.PA_TOKEN }}" \
+            -F "content=@/tmp/__init__.py"
 
-          done < <(
-            find . \
-              -type d \( -name .git -o -name .github -o -name .venv -o -name __pycache__ -o -name node_modules \) -prune -false \
-              -o -type f \
-                ! -name ".DS_Store" \
-                ! -name "*.pyc" \
-                -print0
-          )
+      - name: Upload templates/dashboard.html
+        run: |
+          curl -sf -X POST \
+            "https://www.pythonanywhere.com/api/v0/user/${{ secrets.PA_USERNAME }}/files/path${{ secrets.PA_TARGET_DIR }}/templates/dashboard.html" \
+            -H "Authorization: Token ${{ secrets.PA_TOKEN }}" \
+            -F "content=@templates/dashboard.html"
 
-          echo "Reloading webapp ${DOMAIN}..."
-          curl -sS --fail -X POST \
-            -H "Authorization: Token ${TOKEN}" \
-            "https://${HOST}/api/v0/user/${USER}/webapps/${DOMAIN}/reload/" \
-            >/dev/null
+      - name: Reload web app
+        run: |
+          curl -sf -X POST \
+            "https://www.pythonanywhere.com/api/v0/user/${{ secrets.PA_USERNAME }}/webapps/${{ secrets.PA_WEBAPP_DOMAIN }}/reload/" \
+            -H "Authorization: Token ${{ secrets.PA_TOKEN }}"
 
-          echo "Deployed. Try: https://${DOMAIN}/"
+      - name: Done
+        run: |
+          echo "✅ Déployé sur https://${{ secrets.PA_WEBAPP_DOMAIN }}"
